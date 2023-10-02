@@ -3,20 +3,24 @@ from abc import ABC, abstractmethod
 
 from pcf.term import *
 
+
 class TermBuilder(ABC):
     @abstractmethod
     def term(self) -> Term:
         raise NotImplementedError()
 
+
 Termable = int | str | Term | TermBuilder
+Named = str | Variable | BoundVariable
+
 
 def as_term(t: Termable) -> Term:
     if isinstance(t, int):
         return Number(t)
     elif isinstance(t, str):
         if len(t) == 0:
-            raise ValueError('Empty string is not Termable!')
-        if t[0] == '$':
+            raise ValueError("Empty string is not Termable!")
+        if t[0] == "$":
             return BoundVariable(t)
         else:
             return Variable(t)
@@ -24,6 +28,18 @@ def as_term(t: Termable) -> Term:
         return t
     elif isinstance(t, TermBuilder):
         return as_term(t.term())
+
+
+def as_name(t: Termable) -> str:
+    if isinstance(t, str):
+        return t
+    elif isinstance(t, Variable) or isinstance(t, BoundVariable):
+        return t.name
+    elif isinstance(t, TermBuilder):
+        return as_name(as_term(t))
+    else:
+        raise TypeError(f"termable {t} has cant be named")
+
 
 class ExpressionBuilder(TermBuilder):
     ex: Term
@@ -33,7 +49,7 @@ class ExpressionBuilder(TermBuilder):
 
     def __init__(self, t: Termable) -> None:
         self.ex = as_term(t)
-    
+
     def __add__(self, rhs: Termable) -> ExpressionBuilder:
         return ExpressionBuilder(AddOp(self.ex, as_term(rhs)))
 
@@ -42,25 +58,30 @@ class ExpressionBuilder(TermBuilder):
 
     def __mul__(self, rhs: Termable) -> ExpressionBuilder:
         return ExpressionBuilder(MultiplyOp(self.ex, as_term(rhs)))
-    
+
     def __truediv__(self, rhs: Termable) -> ExpressionBuilder:
         return ExpressionBuilder(DivideOp(self.ex, as_term(rhs)))
+
+    def __call__(self, rhs: Termable) -> ExpressionBuilder:
+        return ExpressionBuilder(Application(self.ex, as_term(rhs)))
+
 
 class FunBuilder(TermBuilder):
     _parameter: BoundVariable
     _body: Term | None = None
-    
-    def __init__(self, name: str) -> None:
-        self._parameter = BoundVariable(name)
-    
+
+    def __init__(self, named: Termable) -> None:
+        self._parameter = BoundVariable(as_name(named))
+
     def term(self) -> Function:
         if self._body is None:
-            raise ValueError('FunBuilder cant build fun with body')
+            raise ValueError("FunBuilder cant build fun with body")
         return Function(self._parameter, self._body)
-    
-    def mapsto(self, term: Termable) -> Function:
+
+    def to_(self, term: Termable) -> Function:
         self._body = as_term(term)
         return self.term()
+
 
 class IfzBuilder(TermBuilder):
     _if_zero_: Term
@@ -69,54 +90,56 @@ class IfzBuilder(TermBuilder):
 
     def __init__(self, if_zero_: Termable) -> None:
         self._if_zero_ = as_term(if_zero_)
-    
+
     def term(self) -> IfZero:
         if self._then_ is None:
-            raise ValueError('IfzBuilder cant build fun with then_ clause')
+            raise ValueError("IfzBuilder cant build fun with then_ clause")
         if self._else_ is None:
-            raise ValueError('IfzBuilder cant build fun with else_ clause')
+            raise ValueError("IfzBuilder cant build fun with else_ clause")
         return IfZero(self._if_zero_, self._then_, self._else_)
-    
+
     def then_(self, then_: Termable) -> IfzBuilder:
         self._then_ = as_term(then_)
         return self
-    
+
     def else_(self, else_: Termable) -> IfZero:
         self._else_ = as_term(else_)
         return self.term()
+
 
 class FixBuilder(TermBuilder):
     _fixed: BoundVariable
     _body: Term | None = None
 
-    def __init__(self, name: str) -> None:
-        self._fixed = BoundVariable(name)
-    
+    def __init__(self, named: Termable) -> None:
+        self._fixed = BoundVariable(as_name(named))
+
     def term(self) -> Fix:
         if self._body is None:
-            raise ValueError('FixBuilder cant build fun with body')
+            raise ValueError("FixBuilder cant build fun with body")
         return Fix(self._fixed, self._body)
 
     def in_(self, t: Termable) -> Fix:
         self._body = as_term(t)
         return self.term()
 
+
 class LetBuilder(TermBuilder):
     _variable: BoundVariable
     _value: Term | None = None
     _in_: Term | None = None
 
-    def __init__(self, name: str) -> None:
-        self._variable = BoundVariable(name)
-    
+    def __init__(self, named: Termable) -> None:
+        self._variable = BoundVariable(as_name(named))
+
     def term(self) -> Let:
         if self._value is None:
-            raise ValueError('LetBuilder cant build fun with value clause')
+            raise ValueError("LetBuilder cant build fun with value clause")
         if self._in_ is None:
-            raise ValueError('LetBuilder cant build fun with in_ clause')
+            raise ValueError("LetBuilder cant build fun with in_ clause")
         return Let(self._variable, self._value, self._in_)
 
-    def be(self, t: Termable) -> LetBuilder:
+    def be_(self, t: Termable) -> LetBuilder:
         self._value = as_term(t)
         return self
 
@@ -126,9 +149,22 @@ class LetBuilder(TermBuilder):
 
 
 t = ExpressionBuilder
-fun = FunBuilder
+map = FunBuilder
 ifz = IfzBuilder
 fix = FixBuilder
 let = LetBuilder
 
-# print(fun('x').mapsto(let('y').be(t('x') / t('x')).in_((t('x') + 1) * t('y'))))
+# fmt: off
+a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z = t("a"), t("b"), t("c"), t("d"), t("e"), t("f"), t("g"), t("h"), t("i"), t("j"), t("k"), t("l"), t("m"), t("n"), t("o"), t("p"), t("q"), t("r"), t("s"), t("t"), t("u"), t("v"), t("w"), t("x"), t("y"), t("z")
+# fmt: on
+
+if __name__ == "__main__":
+    print(
+        map(x).to_(
+            let(f)
+            .be_(
+                map(y).to_(y * y),
+            )
+            .in_((x + 1) * f(4))
+        )
+    )
