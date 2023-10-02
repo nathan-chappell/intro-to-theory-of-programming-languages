@@ -78,3 +78,27 @@ class Let(Term):
     variable: BoundVariable
     value: Term
     in_: Term
+
+
+class PcfType:
+    pass
+
+
+class PcfBaseType(PcfType):
+    name: str
+
+
+@dataclass
+class Natural(PcfBaseType):
+    name = "Natural"
+
+
+@dataclass
+class FunctionType(PcfType):
+    from_: PcfType
+    to_: PcfType
+
+
+@dataclass
+class TypedBoundVariable(BoundVariable):
+    pcf_type: PcfType

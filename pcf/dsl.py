@@ -6,12 +6,30 @@ from pcf.term import *
 
 class TermBuilder(ABC):
     @abstractmethod
-    def term(self) -> Term:
+    def build(self) -> Term:
         raise NotImplementedError()
 
 
-Termable = int | str | Term | TermBuilder
+class PcfTypeBuilder(ABC):
+    @abstractmethod
+    def build(self) -> PcfType:
+        raise NotImplementedError()
+
+
 Named = str | Variable | BoundVariable
+Termable = int | str | Term | TermBuilder
+PcfTypeable = str | PcfType | PcfTypeBuilder
+
+
+def as_name(t: Termable) -> str:
+    if isinstance(t, str):
+        return t
+    elif isinstance(t, Variable) or isinstance(t, BoundVariable):
+        return t.name
+    elif isinstance(t, TermBuilder):
+        return as_name(as_term(t))
+    else:
+        raise TypeError(f"termable {t} has cant be named")
 
 
 def as_term(t: Termable) -> Term:
@@ -27,24 +45,25 @@ def as_term(t: Termable) -> Term:
     elif isinstance(t, Term):
         return t
     elif isinstance(t, TermBuilder):
-        return as_term(t.term())
+        return as_term(t.build())
 
 
-def as_name(t: Termable) -> str:
-    if isinstance(t, str):
+def as_pcf_type(t: PcfTypeable) -> PcfType:
+    if isinstance(t, PcfTypeBuilder):
+        return as_pcf_type(t.build())
+    elif isinstance(t, PcfType):
         return t
-    elif isinstance(t, Variable) or isinstance(t, BoundVariable):
-        return t.name
-    elif isinstance(t, TermBuilder):
-        return as_name(as_term(t))
-    else:
-        raise TypeError(f"termable {t} has cant be named")
+    elif isinstance(t, str):
+        if t == "Nat":
+            return Natural()
+        else:
+            raise ValueError("Only Natural built in type is supported.")
 
 
 class ExpressionBuilder(TermBuilder):
     ex: Term
 
-    def term(self) -> Term:
+    def build(self) -> Term:
         return self.ex
 
     def __init__(self, t: Termable) -> None:
@@ -70,17 +89,17 @@ class FunBuilder(TermBuilder):
     _parameter: BoundVariable
     _body: Term | None = None
 
-    def __init__(self, named: Termable) -> None:
+    def __init__(self, named: Termable, typed: PcfTypeable | None = None) -> None:
         self._parameter = BoundVariable(as_name(named))
 
-    def term(self) -> Function:
+    def build(self) -> Function:
         if self._body is None:
             raise ValueError("FunBuilder cant build fun with body")
         return Function(self._parameter, self._body)
 
     def to_(self, term: Termable) -> Function:
         self._body = as_term(term)
-        return self.term()
+        return self.build()
 
 
 class IfzBuilder(TermBuilder):
@@ -91,7 +110,7 @@ class IfzBuilder(TermBuilder):
     def __init__(self, if_zero_: Termable) -> None:
         self._if_zero_ = as_term(if_zero_)
 
-    def term(self) -> IfZero:
+    def build(self) -> IfZero:
         if self._then_ is None:
             raise ValueError("IfzBuilder cant build fun with then_ clause")
         if self._else_ is None:
@@ -104,24 +123,27 @@ class IfzBuilder(TermBuilder):
 
     def else_(self, else_: Termable) -> IfZero:
         self._else_ = as_term(else_)
-        return self.term()
+        return self.build()
 
 
 class FixBuilder(TermBuilder):
     _fixed: BoundVariable
     _body: Term | None = None
 
-    def __init__(self, named: Termable) -> None:
+    def __init__(
+        self,
+        named: Termable,
+    ) -> None:
         self._fixed = BoundVariable(as_name(named))
 
-    def term(self) -> Fix:
+    def build(self) -> Fix:
         if self._body is None:
             raise ValueError("FixBuilder cant build fun with body")
         return Fix(self._fixed, self._body)
 
     def in_(self, t: Termable) -> Fix:
         self._body = as_term(t)
-        return self.term()
+        return self.build()
 
 
 class LetBuilder(TermBuilder):
@@ -132,7 +154,7 @@ class LetBuilder(TermBuilder):
     def __init__(self, named: Termable) -> None:
         self._variable = BoundVariable(as_name(named))
 
-    def term(self) -> Let:
+    def build(self) -> Let:
         if self._value is None:
             raise ValueError("LetBuilder cant build fun with value clause")
         if self._in_ is None:
@@ -145,7 +167,9 @@ class LetBuilder(TermBuilder):
 
     def in_(self, t: Termable) -> Let:
         self._in_ = as_term(t)
-        return self.term()
+        return self.build()
+
+class FunctionTypeBuilder(PcfTypeBuilder):
 
 
 t = ExpressionBuilder
