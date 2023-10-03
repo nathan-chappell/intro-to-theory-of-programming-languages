@@ -16,7 +16,7 @@ class PcfTypeBuilder(ABC):
         raise NotImplementedError()
 
 
-Named = str | Variable | BoundVariable
+Named = str | Variable
 Termable = int | str | Term | TermBuilder
 PcfTypeable = str | PcfType | PcfTypeBuilder
 
@@ -24,7 +24,7 @@ PcfTypeable = str | PcfType | PcfTypeBuilder
 def as_name(t: Termable) -> str:
     if isinstance(t, str):
         return t
-    elif isinstance(t, Variable) or isinstance(t, BoundVariable):
+    elif isinstance(t, Variable) or isinstance(t, Variable):
         return t.name
     elif isinstance(t, TermBuilder):
         return as_name(as_term(t))
@@ -38,8 +38,6 @@ def as_term(t: Termable) -> Term:
     elif isinstance(t, str):
         if len(t) == 0:
             raise ValueError("Empty string is not Termable!")
-        if t[0] == "$":
-            return BoundVariable(t)
         else:
             return Variable(t)
     elif isinstance(t, Term):
@@ -86,20 +84,29 @@ class ExpressionBuilder(TermBuilder):
 
 
 class FunBuilder(TermBuilder):
-    _parameter: BoundVariable
+    _parameter: Variable
     _body: Term | None = None
 
     def __init__(self, named: Termable, typed: PcfTypeable | None = None) -> None:
-        self._parameter = BoundVariable(as_name(named))
+        self._parameter = Variable(as_name(named))
 
     def build(self) -> Function:
         if self._body is None:
-            raise ValueError("FunBuilder cant build fun with body")
+            raise ValueError("FunBuilder cant build fun without body")
         return Function(self._parameter, self._body)
 
     def to_(self, term: Termable) -> Function:
         self._body = as_term(term)
         return self.build()
+
+    def with_body(self, term: Termable) -> ExpressionBuilder:
+        self._body = as_term(term)
+        return ExpressionBuilder(self.build())
+
+    # def __call__(self, term: Termable) -> Application:
+    #     if self._body is None:
+    #         raise ValueError("FunBuilder cant build application without body")
+    #     return Application(self.build(), as_term(term))
 
 
 class IfzBuilder(TermBuilder):
@@ -127,14 +134,14 @@ class IfzBuilder(TermBuilder):
 
 
 class FixBuilder(TermBuilder):
-    _fixed: BoundVariable
+    _fixed: Variable
     _body: Term | None = None
 
     def __init__(
         self,
         named: Termable,
     ) -> None:
-        self._fixed = BoundVariable(as_name(named))
+        self._fixed = Variable(as_name(named))
 
     def build(self) -> Fix:
         if self._body is None:
@@ -147,12 +154,12 @@ class FixBuilder(TermBuilder):
 
 
 class LetBuilder(TermBuilder):
-    _variable: BoundVariable
+    _variable: Variable
     _value: Term | None = None
     _in_: Term | None = None
 
     def __init__(self, named: Termable) -> None:
-        self._variable = BoundVariable(as_name(named))
+        self._variable = Variable(as_name(named))
 
     def build(self) -> Let:
         if self._value is None:
@@ -169,7 +176,8 @@ class LetBuilder(TermBuilder):
         self._in_ = as_term(t)
         return self.build()
 
-class FunctionTypeBuilder(PcfTypeBuilder):
+
+# class FunctionTypeBuilder(PcfTypeBuilder):
 
 
 t = ExpressionBuilder
@@ -179,7 +187,7 @@ fix = FixBuilder
 let = LetBuilder
 
 # fmt: off
-a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z = t("a"), t("b"), t("c"), t("d"), t("e"), t("f"), t("g"), t("h"), t("i"), t("j"), t("k"), t("l"), t("m"), t("n"), t("o"), t("p"), t("q"), t("r"), t("s"), t("t"), t("u"), t("v"), t("w"), t("x"), t("y"), t("z")
+a, b, c, f, g, x, y, z = t("a"), t("b"), t("c"), t("f"), t("g"), t("x"), t("y"), t("z")
 # fmt: on
 
 if __name__ == "__main__":

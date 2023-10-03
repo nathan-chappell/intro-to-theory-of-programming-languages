@@ -12,18 +12,13 @@ class Variable(Term):
 
 
 @dataclass
-class BoundVariable(Term):
-    name: str
-
-
-@dataclass
 class Number(Term):
     value: int
 
 
 @dataclass
 class Function(Term):
-    parameter: BoundVariable
+    parameter: Variable
     body: Term
 
 
@@ -69,13 +64,13 @@ class IfZero(Term):
 
 @dataclass
 class Fix(Term):
-    fixed: BoundVariable
+    fixed: Variable
     body: Term
 
 
 @dataclass
 class Let(Term):
-    variable: BoundVariable
+    variable: Variable
     value: Term
     in_: Term
 
@@ -97,8 +92,3 @@ class Natural(PcfBaseType):
 class FunctionType(PcfType):
     from_: PcfType
     to_: PcfType
-
-
-@dataclass
-class TypedBoundVariable(BoundVariable):
-    pcf_type: PcfType
