@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import logging
 import operator as OP
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from itertools import chain
+from pprint import pformat
 from typing import TYPE_CHECKING, get_args
 
 from pcf.dsl import TermBuilder, Termable, as_term
 from pcf.term import *
 from pcf.term import Term
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger()
 
 
 @dataclass
@@ -65,11 +70,18 @@ class Context(Mapping[Termable, Term]):
 
 
 def interpret(term: Term | TermBuilder, context: Context = Context()) -> int | Term:
+    # log.debug(pformat(locals(),indent=2))
+    log.debug(context)
+    log.debug(term)
+    log.debug("###")
     if isinstance(term, TermBuilder):
         return interpret(term.build(), context)
     match (term):
-        case Variable(name=var_name):
-            return interpret(context[var_name])
+        case Variable() as var:
+            if var in context:
+                return interpret(context[var])
+            else:
+                return var
 
         case Number(value=num_val):
             return num_val
@@ -83,6 +95,9 @@ def interpret(term: Term | TermBuilder, context: Context = Context()) -> int | T
                 return interpret(Application(fn, fn_arg), context)
             else:
                 return Application(as_term(fn), fn_arg)
+
+        case Function(parameter=fn_param, body=fn_body):
+            return Function(fn_param, as_term(interpret(fn_body, context)))
 
         case BinaryOp(op=_op, left=add_l, right=add_r):
             _binop_l = interpret(add_l, context)
@@ -123,4 +138,5 @@ if __name__ == "__main__":
 
     _term = map("x").with_body(map("y").to_(x + y))(3)(4)
     print(_term.build())
+    print("###")
     print(interpret(_term))
